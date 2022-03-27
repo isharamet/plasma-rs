@@ -1,6 +1,6 @@
 use pixels::{Error, Pixels, SurfaceTexture};
 use rand::seq::SliceRandom;
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
 use std::time::SystemTime;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
@@ -58,23 +58,23 @@ impl Scene {
         let (w, h) = self.size;
         let width = w as usize;
         let height = h as usize;
-        // let mut levels = vec![0i32; width];
-
-        // for i in 0..width {
-        //     levels[i] = self.noise(i as i32);
-        // }
+        let mut levels = vec![0f32; width];
 
         let frequency = 1.0 / 20.0;
         let amplitude = 1.0 / 5.0;
+
+        for i in 0..width {
+            levels[i] = self.noise(i as f32 * frequency) * amplitude;
+        }
 
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
             let y = i / width;
             let x = i % width;
 
-            let n = self.noise(x as f32 * frequency) * amplitude;
+            let n = levels[x];
             let y = 2.0 * (y as f32 / height as f32) - 1.0;
 
-            let r = if n > y { 255 } else { 0 };
+            let r = if n < y { 255 } else { 0 };
             let rgba = [r, 0, 0, 0xff];
 
             pixel.copy_from_slice(&rgba);

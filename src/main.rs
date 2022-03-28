@@ -58,20 +58,16 @@ impl Scene {
         let (w, h) = self.size;
         let width = w as usize;
         let height = h as usize;
-        let mut levels = vec![0f32; width];
-
-        let frequency = 1.0 / 20.0;
-        let amplitude = 1.0 / 5.0;
-
-        for i in 0..width {
-            levels[i] = self.noise(i as f32 * frequency) * amplitude;
-        }
 
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
             let y = i / width;
             let x = i % width;
 
-            let n = levels[x];
+            let n = self.noise(x as f32 * (1.0 / 300.0)) * 1.0
+                + self.noise(x as f32 * (1.0 / 150.0)) * 0.5
+                + self.noise(x as f32 * (1.0 / 75.0)) * 0.25
+                + self.noise(x as f32 * (1.0 / 37.5)) * 0.125;
+
             let y = 2.0 * (y as f32 / height as f32) - 1.0;
 
             let r = if n < y { 255 } else { 0 };

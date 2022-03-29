@@ -14,6 +14,7 @@ const HEIGHT: u32 = 600;
 struct Scene {
     size: (u32, u32),
     gradients: Vec<i8>,
+    start: u128,
     clock: u128,
 }
 
@@ -21,7 +22,8 @@ impl Scene {
     fn new(width: u32, height: u32) -> Self {
         let size = (width, height);
         let mut gradients = vec![0i8; (WIDTH + 1) as usize];
-        let clock = now();
+        let start = now();
+        let clock = 0;
 
         let mut rng = thread_rng();
         let choices: [i8; 2] = [-1, 1];
@@ -33,6 +35,7 @@ impl Scene {
         Scene {
             size,
             gradients,
+            start,
             clock,
         }
     }
@@ -42,6 +45,8 @@ impl Scene {
     }
 
     fn noise(&self, p: f32) -> f32 {
+        let p = p % self.size.0 as f32;
+
         let p0 = p.floor();
         let p1 = p0 + 1.0;
 
@@ -63,10 +68,12 @@ impl Scene {
             let y = i / width;
             let x = i % width;
 
-            let n = self.noise(x as f32 * (1.0 / 300.0)) * 1.0
-                + self.noise(x as f32 * (1.0 / 150.0)) * 0.5
-                + self.noise(x as f32 * (1.0 / 75.0)) * 0.25
-                + self.noise(x as f32 * (1.0 / 37.5)) * 0.125;
+            let pos = (self.clock as f64 / 10.0 + x as f64) as f32;
+
+            let n = self.noise(pos as f32 * (1.0 / 300.0)) * 1.0
+                + self.noise(pos as f32 * (1.0 / 150.0)) * 0.5
+                + self.noise(pos as f32 * (1.0 / 75.0)) * 0.25
+                + self.noise(pos as f32 * (1.0 / 37.5)) * 0.125;
 
             let y = 2.0 * (y as f32 / height as f32) - 1.0;
 
@@ -75,6 +82,10 @@ impl Scene {
 
             pixel.copy_from_slice(&rgba);
         }
+    }
+
+    fn update(&mut self) {
+        self.clock = now() - self.start;
     }
 }
 
@@ -108,7 +119,7 @@ fn main() -> Result<(), Error> {
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
     };
 
-    let scene = Scene::new(WIDTH, HEIGHT);
+    let mut scene = Scene::new(WIDTH, HEIGHT);
 
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
@@ -139,7 +150,8 @@ fn main() -> Result<(), Error> {
             }
 
             // Update internal state and request a redraw
-            // world.update();
+            scene.update();
+
             window.request_redraw();
         }
     });

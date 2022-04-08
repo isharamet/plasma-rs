@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 pub struct Scene {
     size: (u32, u32),
-    gradients: Vec<(f32, f32)>,
+    gradients: Vec<(f32, f32, f32)>,
     start: u128,
     clock: u128,
 }
@@ -12,14 +12,15 @@ pub struct Scene {
 impl Scene {
     pub fn new(width: u32, height: u32) -> Self {
         let size = (width, height);
-        let g_size = (width * height + 1) as usize;
-        let mut gradients = vec![(0f32, 0f32); g_size];
+        let g_size = (width * height) as usize;
+        let mut gradients = vec![(0f32, 0f32, 0f32); g_size];
         let start = now();
         let clock = 0;
         let mut rng = thread_rng();
         let choices: [f32; 2] = [-1.0, 1.0];
         for i in 0..g_size {
             gradients[i as usize] = (
+                *choices.choose(&mut rng).expect(""),
                 *choices.choose(&mut rng).expect(""),
                 *choices.choose(&mut rng).expect(""),
             );
@@ -32,34 +33,55 @@ impl Scene {
         }
     }
 
-    pub fn grad(&self, p: (f32, f32)) -> (f32, f32) {
+    pub fn grad(&self, p: (f32, f32, f32)) -> (f32, f32, f32) {
         let width = self.size.0 as usize;
-        let (x, y) = p;
+        let (x, y, z) = p;
         let x = x as usize;
         let y = y as usize;
-        self.gradients[y * width + x]
+        let z = (z as usize) % 10;
+
+        let i = y * width + x * 10 + z;
+
+        self.gradients[i]
     }
 
-    pub fn noise(&self, p: (f32, f32)) -> f32 {
+    pub fn noise(&self, p: (f32, f32, f32)) -> f32 {
         let p0 = floor(p);
-        let p1 = sum(p0, (1.0, 0.0));
-        let p2 = sum(p0, (0.0, 1.0));
-        let p3 = sum(p0, (1.0, 1.0));
+
+        let p1 = sum(p0, (1.0, 0.0, 0.0));
+        let p2 = sum(p0, (0.0, 1.0, 0.0));
+        let p3 = sum(p0, (1.0, 1.0, 0.0));
+        let p4 = sum(p0, (0.0, 0.0, 1.0));
+        let p5 = sum(p4, (1.0, 0.0, 0.0));
+        let p6 = sum(p4, (0.0, 1.0, 0.0));
+        let p7 = sum(p4, (1.0, 1.0, 0.0));
 
         let g0 = self.grad(p0);
         let g1 = self.grad(p1);
         let g2 = self.grad(p2);
         let g3 = self.grad(p3);
+        let g4 = self.grad(p4);
+        let g5 = self.grad(p5);
+        let g6 = self.grad(p6);
+        let g7 = self.grad(p7);
 
         let t0 = p.0 - p0.0;
         let fade_t0 = fade(t0);
         let t1 = p.1 - p0.1;
         let fade_t1 = fade(t1);
+        let t2 = p.2 - p0.2;
+        let fade_t2 = fade(t2);
 
         let p0p1 = (1.0 - fade_t0) * dot(g0, diff(p, p0)) + fade_t0 * dot(g1, diff(p, p1));
         let p2p3 = (1.0 - fade_t0) * dot(g2, diff(p, p2)) + fade_t0 * dot(g3, diff(p, p3));
 
-        (1.0 - fade_t1) * p0p1 + fade_t1 * p2p3
+        let p4p5 = (1.0 - fade_t0) * dot(g4, diff(p, p4)) + fade_t0 * dot(g5, diff(p, p5));
+        let p6p7 = (1.0 - fade_t0) * dot(g6, diff(p, p6)) + fade_t0 * dot(g7, diff(p, p7));
+
+        let y1 = (1.0 - fade_t1) * p0p1 + fade_t1 * p2p3;
+        let y2 = (1.0 - fade_t1) * p4p5 + fade_t1 * p6p7;
+
+        (1.0 - fade_t2) * y1 + fade_t2 * y2
     }
 
     pub fn draw(&self, frame: &mut [u8]) {
@@ -67,18 +89,17 @@ impl Scene {
         let width = w as usize;
 
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let y = i / width;
-            let x = i % width;
-            let p = (x as f32, y as f32);
+            let y = (i / width) as f32;
+            let x = (i % width) as f32;
+            let shift = self.clock as f32 / 40.0;
 
-            let n = self.noise(div(p, 64.0)) * 1.0
-                + self.noise(div(p, 32.0)) * 0.5
-                + self.noise(div(p, 16.0)) * 0.25
-                + self.noise(div(p, 8.0)) * 0.125;
+            let n = self.noise(div((x, y, shift), 64.0)) * 1.0
+                + self.noise(div((x, y, shift), 32.0)) * 0.5
+                + self.noise(div((x, y, shift), 16.0)) * 0.25;
 
-            let r = ((n * 0.5 + 0.5) * 255.0) as u8;
+            let g = ((n * 0.5 + 0.5) * 255.0) as u8;
 
-            let rgba = [r, 0, 0, 0xff];
+            let rgba = [0, g, 0, 0xff];
 
             pixel.copy_from_slice(&rgba);
         }
@@ -100,22 +121,22 @@ fn fade(t: f32) -> f32 {
     t.powi(3) * (t * (t * 6.0 - 15.0) + 10.0)
 }
 
-fn floor((x1, y1): (f32, f32)) -> (f32, f32) {
-    (x1.floor(), y1.floor())
+fn floor((x, y, z): (f32, f32, f32)) -> (f32, f32, f32) {
+    (x.floor(), y.floor(), z.floor())
 }
 
-fn sum((x1, y1): (f32, f32), (x2, y2): (f32, f32)) -> (f32, f32) {
-    (x1 + x2, y1 + y2)
+fn sum((x1, y1, z1): (f32, f32, f32), (x2, y2, z2): (f32, f32, f32)) -> (f32, f32, f32) {
+    (x1 + x2, y1 + y2, z1 + z2)
 }
 
-fn diff((x1, y1): (f32, f32), (x2, y2): (f32, f32)) -> (f32, f32) {
-    (x1 - x2, y1 - y2)
+fn diff((x1, y1, z1): (f32, f32, f32), (x2, y2, z2): (f32, f32, f32)) -> (f32, f32, f32) {
+    (x1 - x2, y1 - y2, z1 - z2)
 }
 
-fn div((x, y): (f32, f32), d: f32) -> (f32, f32) {
-    (x / d, y / d)
+fn div((x, y, z): (f32, f32, f32), d: f32) -> (f32, f32, f32) {
+    (x / d, y / d, z / d)
 }
 
-fn dot((x1, y1): (f32, f32), (x2, y2): (f32, f32)) -> f32 {
-    x1 * x2 + y1 * y2
+fn dot((x1, y1, z1): (f32, f32, f32), (x2, y2, z2): (f32, f32, f32)) -> f32 {
+    x1 * x2 + y1 * y2 + z1 * z2
 }

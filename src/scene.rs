@@ -97,9 +97,17 @@ impl Scene {
                 + self.noise(div((x, y, shift), 32.0)) * 0.5
                 + self.noise(div((x, y, shift), 16.0)) * 0.25;
 
-            let g = ((n * 0.5 + 0.5) * 255.0) as u8;
+            let c = ((n * 0.5 + 0.5) * 255.0) as u8;
 
-            let rgba = [0, g, 0, 0xff];
+            let rgba = if c < 64 {
+                [0, 0, c * 4, 0xff]
+            } else if c >= 64 && c < 128 {
+                [0, c * 4, (127 - c) * 4, 0xff]
+            } else if c >= 128 && c < 192 {
+                [(c - 128) * 4, (191 - c) * 4, 0, 0xff]
+            } else {
+                [(255 - c) * 4, 0, 0, 0xff]
+            };
 
             pixel.copy_from_slice(&rgba);
         }

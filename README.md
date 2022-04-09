@@ -1,9 +1,9 @@
 # plasma-rs
 
-Simple [tunnel](https://lodev.org/cgtutor/tunnel.html) effect with XOR texture implemented in Rust.
+Simple RGB "plasma" effect implementation using Perlin noise.
 
 <p align="center">
-  <img src="https://github.com/isharamet/plasma-rs/raw/master/img/plasma-rs.gif" width="320" height="240">
+  <img src="https://github.com/isharamet/plasma-rs/raw/main/img/plasma-rs.gif" width="320" height="240">
 </p>
 
 ## Building and running

@@ -104,7 +104,8 @@ impl Scene {
 
                 let n = scene.noise(div((x, y, shift), 256.0)) * 1.0
                     + scene.noise(div((x, y, shift), 128.0)) * 0.5
-                    + scene.noise(div((x, y, shift), 64.0)) * 0.25;
+                    + scene.noise(div((x, y, shift), 64.0)) * 0.25
+                    + scene.noise(div((x, y, shift), 32.0)) * 0.125;
 
                 let c = ((n * 0.5 + 0.5) * 255.0) as u8;
 

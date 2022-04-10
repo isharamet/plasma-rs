@@ -33,7 +33,6 @@ fn main() -> Result<(), Error> {
     let mut scene = Scene::new(WIDTH, HEIGHT);
 
     event_loop.run(move |event, _, control_flow| {
-        // Draw the current frame
         if let Event::RedrawRequested(_) = event {
             scene.draw(pixels.get_frame());
 
@@ -47,20 +46,16 @@ fn main() -> Result<(), Error> {
             }
         }
 
-        // Handle input events
         if input.update(&event) {
-            // Close events
             if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
                 *control_flow = ControlFlow::Exit;
                 return;
             }
 
-            // Resize the window
             if let Some(size) = input.window_resized() {
                 pixels.resize_surface(size.width, size.height);
             }
 
-            // Update internal state and request a redraw
             scene.update();
 
             window.request_redraw();

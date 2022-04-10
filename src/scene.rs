@@ -85,32 +85,53 @@ impl Scene {
     }
 
     pub fn draw(&self, frame: &mut [u8]) {
-        let (w, _) = self.size;
+        let (w, h) = self.size;
         let width = w as usize;
+        let height = h as usize;
 
-        for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let y = (i / width) as f32;
-            let x = (i % width) as f32;
-            let shift = self.clock as f32 / 40.0;
+        let threads = 40;
+        let rows_per_band = height / threads + 1;
 
-            let n = self.noise(div((x, y, shift), 64.0)) * 1.0
-                + self.noise(div((x, y, shift), 32.0)) * 0.5
-                + self.noise(div((x, y, shift), 16.0)) * 0.25;
+        let band_size = rows_per_band * width * 4;
+        let bands: Vec<&mut [u8]> = frame.chunks_mut(band_size).collect();
 
-            let c = ((n * 0.5 + 0.5) * 255.0) as u8;
+        fn render_band(band: &mut [u8], width: usize, offset: usize, scene: &Scene) {
+            for (i, pixel) in band.chunks_exact_mut(4).enumerate() {
+                let j = i + offset;
+                let x = (j % width) as f32;
+                let y = (j / width) as f32;
+                let shift = scene.clock as f32 / 40.0;
 
-            let rgba = if c < 64 {
-                [0, 0, c * 4, 0xff]
-            } else if c >= 64 && c < 128 {
-                [0, c * 4, (127 - c) * 4, 0xff]
-            } else if c >= 128 && c < 192 {
-                [(c - 128) * 4, (191 - c) * 4, 0, 0xff]
-            } else {
-                [(255 - c) * 4, 0, 0, 0xff]
-            };
+                let n = scene.noise(div((x, y, shift), 256.0)) * 1.0
+                    + scene.noise(div((x, y, shift), 128.0)) * 0.5
+                    + scene.noise(div((x, y, shift), 64.0)) * 0.25;
 
-            pixel.copy_from_slice(&rgba);
+                let c = ((n * 0.5 + 0.5) * 255.0) as u8;
+
+                let rgba = if c < 64 {
+                    [0, 0, c * 4, 0xff]
+                } else if c >= 64 && c < 128 {
+                    [0, (c - 64) * 4, (127 - c) * 4, 0xff]
+                } else if c >= 128 && c < 192 {
+                    [(c - 128) * 4, (191 - c) * 4, 0, 0xff]
+                } else {
+                    [(255 - c) * 4, 0, 0, 0xff]
+                };
+
+                pixel.copy_from_slice(&rgba);
+            }
         }
+
+        crossbeam::scope(|spawner| {
+            for (i, band) in bands.into_iter().enumerate() {
+                let offset = i * rows_per_band * width;
+
+                spawner.spawn(move |_| {
+                    render_band(band, width, offset, self);
+                });
+            }
+        })
+        .unwrap();
     }
 
     pub fn update(&mut self) {
